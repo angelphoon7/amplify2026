@@ -1,11 +1,14 @@
 import tkinter as tk
 from tkinter import font
+import importlib.util
+import os
 
 class LandingPage:
     def __init__(self, root):
         self.root = root
         self.root.title("MedCAD Digital Library | National Digital Supply Network")
         self.root.geometry("950x750")
+        self.root.state("zoomed")
         self.root.configure(bg="#f4f7f6") # Soft light gray/blue background
 
         # Custom Fonts
@@ -97,18 +100,59 @@ class LandingPage:
         tk.Label(card, text=title, font=self.title_font, bg="white", fg="#0a2540").pack(anchor="center", pady=(0, 10))
         tk.Label(card, text=text, font=self.body_font, bg="white", fg="#555555", justify="center", wraplength=220).pack(anchor="center")
 
+    def show_success_toast(self):
+        toast = tk.Toplevel(self.root)
+        toast.overrideredirect(True)
+        toast.attributes("-alpha", 1.0)
+        toast.configure(bg="#28a745")
+        tk.Label(toast, text="  ✓  Account registered successfully  ",
+                 font=self.body_font, bg="#28a745", fg="white", pady=12, padx=6).pack()
+        self.root.update_idletasks()
+        x = self.root.winfo_x() + self.root.winfo_width() - 290
+        y = self.root.winfo_y() + 70
+        toast.geometry(f"+{x}+{y}")
+
+        def fade(alpha=1.0):
+            if not toast.winfo_exists():
+                return
+            if alpha <= 0:
+                toast.destroy()
+                return
+            toast.attributes("-alpha", alpha)
+            toast.after(40, fade, round(alpha - 0.04, 2))
+
+        toast.after(1500, fade)
+
+    def open_hospital_portal(self):
+        self.root.destroy()
+        root2 = tk.Tk()
+        spec = importlib.util.spec_from_file_location("interface2", os.path.join(os.path.dirname(os.path.abspath(__file__)), "interface 2.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.HospitalPortal(root2)
+        root2.mainloop()
+
     def build_auth_buttons(self):
-        # New frame specifically for Login/Signup, with extra top padding to fill empty space
         auth_frame = tk.Frame(self.root, bg="#f4f7f6")
-        auth_frame.pack(pady=(40, 20)) 
+        auth_frame.pack(pady=(30, 20))
+
+        # Email field
+        tk.Label(auth_frame, text="Email Address", font=self.body_font, bg="#f4f7f6", fg="#333333").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 4))
+        email_entry = tk.Entry(auth_frame, font=self.body_font, width=30, relief="solid", bd=1)
+        email_entry.grid(row=1, column=0, columnspan=2, ipady=6, pady=(0, 12), sticky="ew")
+
+        # Password field
+        tk.Label(auth_frame, text="Password", font=self.body_font, bg="#f4f7f6", fg="#333333").grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 4))
+        password_entry = tk.Entry(auth_frame, font=self.body_font, width=30, relief="solid", bd=1, show="●")
+        password_entry.grid(row=3, column=0, columnspan=2, ipady=6, pady=(0, 20), sticky="ew")
 
         # Log In Button
-        login_btn = tk.Button(auth_frame, text="Log In", font=self.title_font, bg="#0a2540", fg="white", activebackground="#113a63", activeforeground="white", borderwidth=0, padx=30, pady=10)
-        login_btn.grid(row=0, column=0, padx=10)
+        login_btn = tk.Button(auth_frame, text="Log In", font=self.title_font, bg="#0a2540", fg="white", activebackground="#113a63", activeforeground="white", borderwidth=0, padx=30, pady=10, command=self.open_hospital_portal)
+        login_btn.grid(row=4, column=0, padx=10)
 
         # Sign Up Button
-        signup_btn = tk.Button(auth_frame, text="Sign Up", font=self.title_font, bg="#00d4ff", fg="#0a2540", activebackground="#00b8e6", borderwidth=0, padx=30, pady=10)
-        signup_btn.grid(row=0, column=1, padx=10)
+        signup_btn = tk.Button(auth_frame, text="Sign Up", font=self.title_font, bg="#00d4ff", fg="#0a2540", activebackground="#00b8e6", borderwidth=0, padx=30, pady=10, command=self.show_success_toast)
+        signup_btn.grid(row=4, column=1, padx=10)
 
     def build_footer(self):
         footer_frame = tk.Frame(self.root, bg="#f4f7f6")

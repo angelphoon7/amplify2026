@@ -6,6 +6,7 @@ class CompliancePassport:
         self.root = root
         self.root.title("MedCAD | Traceability & Compliance Passport")
         self.root.geometry("1000x700")
+        self.root.state("zoomed")
         self.root.configure(bg="#f4f7f6")
 
         # Fonts

@@ -124,6 +124,18 @@ class LandingPage:
 
         toast.after(1500, fade)
 
+    def open_liability_pdf(self):
+        pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "MedCAD-002_Liability_Framework.pdf")
+        chrome_paths = [
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        ]
+        for chrome in chrome_paths:
+            if os.path.exists(chrome):
+                subprocess.Popen([chrome, pdf_path])
+                return
+        os.startfile(pdf_path)
+
     def open_terms_pdf(self):
         pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "MedCAD-001_Terms_and_Conditions_Agreement.pdf")
         chrome_paths = [
@@ -168,6 +180,10 @@ class LandingPage:
         link = tk.Label(terms_frame, text="terms and conditions", font=font.Font(family="Helvetica", size=10, underline=True), bg="#f4f7f6", fg="#0077cc", cursor="hand2")
         link.pack(side="left")
         link.bind("<Button-1>", lambda _e: self.open_terms_pdf())
+        tk.Label(terms_frame, text=" and ", font=self.small_font, bg="#f4f7f6", fg="#333333").pack(side="left")
+        link2 = tk.Label(terms_frame, text="liability framework", font=font.Font(family="Helvetica", size=10, underline=True), bg="#f4f7f6", fg="#0077cc", cursor="hand2")
+        link2.pack(side="left")
+        link2.bind("<Button-1>", lambda _e: self.open_liability_pdf())
 
         # Log In Button
         login_btn = tk.Button(auth_frame, text="Log In", font=self.title_font, bg="#0a2540", fg="white", activebackground="#113a63", activeforeground="white", borderwidth=0, padx=30, pady=10, command=self.open_hospital_portal)

@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk, font
 import importlib.util
 import os
+import random
+import string
 
 PART_SPECS = {
     "MC-104": {
@@ -272,6 +274,10 @@ class HospitalPortal:
         self.body_font = font.Font(family="Helvetica", size=11)
         self.small_font = font.Font(family="Helvetica", size=10)
         self.cart_count = 0
+        self.cart_items = []
+        self.confirmed_orders = []
+        self.order_number = None
+        self.current_part_id = "MC-104"
 
         self.build_header()
         self.build_welcome_banner()
@@ -293,6 +299,7 @@ class HospitalPortal:
         header.pack_propagate(False)
         tk.Label(header, text="🏥 Trust Portal: London General", font=self.title_font, fg="white", bg="#008080").pack(side="left", padx=20, pady=15)
         tk.Button(header, text="Log Out", font=self.body_font, bg="#cc0000", fg="white", activebackground="#a30000", activeforeground="white", borderwidth=0, padx=15, pady=6, command=self.open_landing_page).pack(side="right", padx=20, pady=18)
+        tk.Button(header, text="📋  Your Order", font=self.body_font, bg="#005f5f", fg="white", activebackground="#004d4d", activeforeground="white", borderwidth=0, padx=15, pady=6, command=self.open_confirmed_orders).pack(side="right", padx=(0, 10), pady=18)
         tk.Label(header, text="Role: In-house Engineering", font=self.body_font, fg="#e0e0e0", bg="#008080").pack(side="right", padx=(20, 0), pady=20)
 
     def build_welcome_banner(self):
@@ -405,12 +412,146 @@ class HospitalPortal:
 
         cart_container = tk.Frame(btn_frame, bg="white")
         cart_container.pack(side="right", padx=(10, 0))
-        tk.Button(cart_container, text="🛒  Cart", font=self.header_font, bg="#0a2540", fg="white", activebackground="#113a63", activeforeground="white", padx=15, pady=10, borderwidth=0).pack()
+        tk.Button(cart_container, text="🛒  Cart", font=self.header_font, bg="#0a2540", fg="white", activebackground="#113a63", activeforeground="white", padx=15, pady=10, borderwidth=0, command=self.open_order_summary).pack()
         badge_text = str(self.cart_count) if self.cart_count > 0 else ""
         self.cart_badge = tk.Label(cart_container, text=badge_text, bg="#cc0000", fg="white", font=font.Font(family="Helvetica", size=9, weight="bold"), padx=4, pady=1)
         self.cart_badge.place(relx=1.0, rely=0.0, anchor="ne")
 
         tk.Button(btn_frame, text="Add to Cart ➔", font=self.header_font, bg="#00d4ff", fg="#0a2540", activebackground="#00b8e6", padx=20, pady=10, borderwidth=0, command=self._add_to_cart).pack(side="right")
+
+    def open_traceability_passport(self):
+        root3 = tk.Toplevel(self.root)
+        spec = importlib.util.spec_from_file_location("interface3", os.path.join(os.path.dirname(os.path.abspath(__file__)), "interface 3.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.CompliancePassport(root3)
+
+    def open_confirmed_orders(self):
+        page = tk.Toplevel(self.root)
+        page.title("MedCAD | Your Orders")
+        page.geometry("900x600")
+        page.state("zoomed")
+        page.configure(bg="#f4f7f6")
+
+        header = tk.Frame(page, bg="#008080", height=70)
+        header.pack(fill="x")
+        header.pack_propagate(False)
+        tk.Label(header, text="📋  Your Orders", font=self.title_font, fg="white", bg="#008080").pack(side="left", padx=20, pady=15)
+        tk.Button(header, text="✕  Close", font=self.body_font, bg="#cc0000", fg="white", activebackground="#a30000", borderwidth=0, padx=15, pady=6, command=page.destroy).pack(side="right", padx=20, pady=18)
+
+        content = tk.Frame(page, bg="#f4f7f6")
+        content.pack(fill="both", expand=True, padx=30, pady=20)
+
+        if not self.confirmed_orders:
+            tk.Label(content, text="No confirmed orders yet.", font=self.body_font, bg="#f4f7f6", fg="#888888").pack(pady=60)
+            return
+
+        canvas = tk.Canvas(content, bg="#f4f7f6", highlightthickness=0)
+        scrollbar = tk.Scrollbar(content, orient="vertical", command=canvas.yview)
+        scroll_frame = tk.Frame(canvas, bg="#f4f7f6")
+        scroll_frame.bind("<Configure>", lambda _e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        for order in self.confirmed_orders:
+            order_card = tk.Frame(scroll_frame, bg="white", highlightbackground="#cccccc", highlightthickness=1)
+            order_card.pack(fill="x", pady=10, padx=5)
+
+            title_bar = tk.Frame(order_card, bg="#0a2540", pady=8, padx=15)
+            title_bar.pack(fill="x")
+            tk.Label(title_bar, text=f"Order Number:  {order['order_number']}", font=self.header_font, bg="#0a2540", fg="#00d4ff").pack(side="left")
+            tk.Label(title_bar, text=f"{len(order['items'])} item(s)", font=self.body_font, bg="#0a2540", fg="#aaaaaa").pack(side="right")
+
+            col_frame = tk.Frame(order_card, bg="#e8f4f4")
+            col_frame.pack(fill="x")
+            for text, w in [("Part ID", 10), ("Component Name", 30), ("OEM", 15), ("Hub", 22), ("Est. Time", 14)]:
+                tk.Label(col_frame, text=text, font=self.small_font, bg="#e8f4f4", fg="#004d4d", width=w, anchor="w").pack(side="left", padx=8, pady=5)
+
+            for i, item in enumerate(order["items"]):
+                row_bg = "white" if i % 2 == 0 else "#f9f9f9"
+                row = tk.Frame(order_card, bg=row_bg)
+                row.pack(fill="x")
+                for text, w in [(item["id"], 10), (item["name"], 30), (item["oem"], 15), (item["hub"], 22), (item["time"], 14)]:
+                    tk.Label(row, text=text, font=self.small_font, bg=row_bg, fg="#333333", width=w, anchor="w").pack(side="left", padx=8, pady=6)
+
+            passport_bar = tk.Frame(order_card, bg="white", pady=8, padx=10)
+            passport_bar.pack(fill="x")
+            tk.Button(passport_bar, text="🛡️  Quality & Traceability Passport", font=self.body_font, bg="#0a2540", fg="white", activebackground="#113a63", borderwidth=0, padx=15, pady=7, command=self.open_traceability_passport).pack(side="left")
+
+    def open_order_summary(self):
+        summary = tk.Toplevel(self.root)
+        summary.title("MedCAD | Order Summary")
+        summary.geometry("800x550")
+        summary.state("zoomed")
+        summary.configure(bg="#f4f7f6")
+
+        header = tk.Frame(summary, bg="#008080", height=70)
+        header.pack(fill="x")
+        header.pack_propagate(False)
+        tk.Label(header, text="🛒 Order Summary", font=self.title_font, fg="white", bg="#008080").pack(side="left", padx=20, pady=15)
+        tk.Button(header, text="✕  Close", font=self.body_font, bg="#cc0000", fg="white", activebackground="#a30000", borderwidth=0, padx=15, pady=6, command=summary.destroy).pack(side="right", padx=20, pady=18)
+
+        content = tk.Frame(summary, bg="#f4f7f6")
+        content.pack(fill="both", expand=True, padx=30, pady=20)
+
+        def remove_item(index):
+            self.cart_items.pop(index)
+            self.cart_count -= 1
+            self.cart_badge.config(text=str(self.cart_count) if self.cart_count > 0 else "")
+            if not self.cart_items:
+                self.order_number = None
+            refresh()
+
+        def refresh():
+            for w in content.winfo_children():
+                w.destroy()
+
+            if not self.cart_items:
+                tk.Label(content, text="Your cart is empty. Add items from the catalog.", font=self.body_font, bg="#f4f7f6", fg="#888888").pack(pady=60)
+                return
+
+            order_bar = tk.Frame(content, bg="#e6f2f2", pady=10, padx=15)
+            order_bar.pack(fill="x", pady=(0, 15))
+            tk.Label(order_bar, text="Order Number:", font=self.header_font, bg="#e6f2f2", fg="#004d4d").pack(side="left")
+            tk.Label(order_bar, text=f"  {self.order_number}", font=font.Font(family="Helvetica", size=14, weight="bold"), bg="#e6f2f2", fg="#0a2540").pack(side="left")
+
+            col_frame = tk.Frame(content, bg="#0a2540")
+            col_frame.pack(fill="x")
+            for text, w in [("#", 4), ("Part ID", 10), ("Component Name", 30), ("OEM", 15), ("Hub", 20), ("Est. Time", 13), ("", 8)]:
+                tk.Label(col_frame, text=text, font=self.header_font, bg="#0a2540", fg="white", width=w, anchor="w").pack(side="left", padx=8, pady=8)
+
+            for i, item in enumerate(self.cart_items):
+                row_bg = "white" if i % 2 == 0 else "#f0f4f4"
+                row = tk.Frame(content, bg=row_bg, highlightbackground="#e0e0e0", highlightthickness=1)
+                row.pack(fill="x", pady=1)
+                for text, w in [(str(i + 1), 4), (item["id"], 10), (item["name"], 30), (item["oem"], 15), (item["hub"], 20), (item["time"], 13)]:
+                    tk.Label(row, text=text, font=self.body_font, bg=row_bg, fg="#333333", width=w, anchor="w").pack(side="left", padx=8, pady=8)
+                remove_link = tk.Label(row, text="Remove", font=font.Font(family="Helvetica", size=11, underline=True), bg=row_bg, fg="#cc0000", cursor="hand2")
+                remove_link.pack(side="right", padx=12)
+                remove_link.bind("<Button-1>", lambda _e, idx=i: remove_item(idx))
+
+            tk.Frame(content, bg="#cccccc", height=1).pack(fill="x", pady=15)
+            tk.Label(content, text=f"Total Items in Order: {len(self.cart_items)}", font=self.header_font, bg="#f4f7f6", fg="#0a2540").pack(anchor="e")
+            def confirm_order():
+                self.confirmed_orders.append({
+                    "order_number": self.order_number,
+                    "items": list(self.cart_items),
+                })
+                self.cart_items.clear()
+                self.cart_count = 0
+                self.order_number = None
+                self.cart_badge.config(text="")
+                notif = tk.Frame(summary, bg="#28a745", padx=15, pady=12)
+                notif.place(relx=1.0, rely=0.0, anchor="ne", x=-15, y=15)
+                tk.Label(notif, text="✓  Order confirmed, you may close this page now",
+                         font=self.body_font, bg="#28a745", fg="white").pack()
+                refresh()
+
+            tk.Button(content, text="Confirm Order  ➔", font=self.header_font, bg="#008080", fg="white", activebackground="#006666", borderwidth=0, padx=20, pady=10, command=confirm_order).pack(anchor="e", pady=(10, 0))
+
+        refresh()
 
     def _select_part(self, iid, part_id):
         if self.selected_iid and self.selected_iid != iid:
@@ -422,11 +563,24 @@ class HospitalPortal:
             values[1] = values[1] + " (SELECTED)"
         self.tree.item(iid, values=values, tags=('selected',))
         self.selected_iid = iid
+        self.current_part_id = part_id
         self._render_part_details(part_id)
 
     def _add_to_cart(self):
+        if self.order_number is None:
+            chars = string.ascii_uppercase + string.digits
+            self.order_number = "ORD-" + "".join(random.choices(chars, k=3)) + "-" + "".join(random.choices(chars, k=4))
         self.cart_count += 1
         self.cart_badge.config(text=str(self.cart_count))
+        spec = PART_SPECS[self.current_part_id]
+        oem = self.tree.item(self.item_iids[self.current_part_id], "values")[2]
+        self.cart_items.append({
+            "id": self.current_part_id,
+            "name": spec["name"].rsplit(" (", 1)[0],
+            "oem": oem,
+            "hub": spec["log"][0].replace("• Print Hub: ", ""),
+            "time": spec["log"][1].replace("• Est. Print Time: ", ""),
+        })
 
     def on_part_double_click(self, _event):
         selected = self.tree.selection()

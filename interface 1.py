@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import font
 import importlib.util
 import os
+import subprocess
 
 class LandingPage:
     def __init__(self, root):
@@ -123,13 +124,25 @@ class LandingPage:
 
         toast.after(1500, fade)
 
+    def open_terms_pdf(self):
+        pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "MedCAD-001_Terms_and_Conditions_Agreement.pdf")
+        chrome_paths = [
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        ]
+        for chrome in chrome_paths:
+            if os.path.exists(chrome):
+                subprocess.Popen([chrome, pdf_path])
+                return
+        os.startfile(pdf_path)
+
     def open_hospital_portal(self):
-        self.root.destroy()
         root2 = tk.Tk()
         spec = importlib.util.spec_from_file_location("interface2", os.path.join(os.path.dirname(os.path.abspath(__file__)), "interface 2.py"))
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         mod.HospitalPortal(root2)
+        root2.after(400, self.root.destroy)
         root2.mainloop()
 
     def build_auth_buttons(self):
@@ -144,15 +157,25 @@ class LandingPage:
         # Password field
         tk.Label(auth_frame, text="Password", font=self.body_font, bg="#f4f7f6", fg="#333333").grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 4))
         password_entry = tk.Entry(auth_frame, font=self.body_font, width=30, relief="solid", bd=1, show="●")
-        password_entry.grid(row=3, column=0, columnspan=2, ipady=6, pady=(0, 20), sticky="ew")
+        password_entry.grid(row=3, column=0, columnspan=2, ipady=6, pady=(0, 12), sticky="ew")
+
+        # Terms and conditions checkbox row
+        terms_frame = tk.Frame(auth_frame, bg="#f4f7f6")
+        terms_frame.grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 16))
+        self.agreed_var = tk.BooleanVar()
+        tk.Checkbutton(terms_frame, variable=self.agreed_var, bg="#f4f7f6", activebackground="#f4f7f6").pack(side="left")
+        tk.Label(terms_frame, text="I agree to the ", font=self.small_font, bg="#f4f7f6", fg="#333333").pack(side="left")
+        link = tk.Label(terms_frame, text="terms and conditions", font=font.Font(family="Helvetica", size=10, underline=True), bg="#f4f7f6", fg="#0077cc", cursor="hand2")
+        link.pack(side="left")
+        link.bind("<Button-1>", lambda _e: self.open_terms_pdf())
 
         # Log In Button
         login_btn = tk.Button(auth_frame, text="Log In", font=self.title_font, bg="#0a2540", fg="white", activebackground="#113a63", activeforeground="white", borderwidth=0, padx=30, pady=10, command=self.open_hospital_portal)
-        login_btn.grid(row=4, column=0, padx=10)
+        login_btn.grid(row=5, column=0, padx=10)
 
         # Sign Up Button
         signup_btn = tk.Button(auth_frame, text="Sign Up", font=self.title_font, bg="#00d4ff", fg="#0a2540", activebackground="#00b8e6", borderwidth=0, padx=30, pady=10, command=self.show_success_toast)
-        signup_btn.grid(row=4, column=1, padx=10)
+        signup_btn.grid(row=5, column=1, padx=10)
 
     def build_footer(self):
         footer_frame = tk.Frame(self.root, bg="#f4f7f6")

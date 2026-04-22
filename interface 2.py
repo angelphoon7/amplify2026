@@ -15,6 +15,10 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
+import cart_list
+import payment
+import your_order
+
 PART_SPECS = {
     "MC-104": {
         "name": "Ventilator Monitor Bracket (MC-104)",
@@ -298,10 +302,8 @@ class HospitalPortal:
         self.header_font = font.Font(family="Helvetica", size=13, weight="bold")
         self.body_font = font.Font(family="Helvetica", size=11)
         self.small_font = font.Font(family="Helvetica", size=10)
-        self.cart_count = 0
-        self.cart_items = []
+        self.cart = cart_list.Cart()
         self.confirmed_orders = []
-        self.order_number = None
         self.current_part_id = "MC-104"
 
         self.build_header()
@@ -327,8 +329,22 @@ class HospitalPortal:
         tk.Button(header, text="Log Out", font=self.body_font, bg="#cc0000", fg="white", activebackground="#a30000", activeforeground="white", borderwidth=0, padx=15, pady=6, command=self.open_landing_page).pack(side="right", padx=20, pady=18)
         tk.Button(header, text="📋  Your Order", font=self.body_font, bg="#005f5f", fg="white",
           activebackground="#004d4d", activeforeground="white", borderwidth=0,
-          padx=15, pady=6, command=self.open_confirmed_orders).pack(side="right", padx=(0, 10), pady=18)
+          padx=15, pady=6, command=self.open_your_orders_page).pack(side="right", padx=(0, 10), pady=18)
         tk.Label(header, text="Role: In-house Engineering", font=self.body_font, fg="#e0e0e0", bg="#008080").pack(side="right", padx=(20, 0), pady=20)
+
+    def open_your_orders_page(self, amount_paid=None):
+        # Show final "Your Orders" page implemented in your_order.py
+        your_order.open_your_orders_window(
+            parent=self.root,
+            orders=list(self.confirmed_orders),
+            amount_paid=amount_paid,
+            title_font=self.title_font,
+            header_font=self.header_font,
+            body_font=self.body_font,
+            small_font=self.small_font,
+            on_open_passport=self.open_traceability_passport,
+            on_open_invoice=self.generate_invoice,
+        )
 
     def build_welcome_banner(self):
         banner = tk.Frame(self.root, bg="#e6f2f2", pady=15, padx=20)
@@ -407,7 +423,7 @@ class HospitalPortal:
         cart_container = tk.Frame(btn_bar, bg="white")
         cart_container.pack(side="right", padx=(10, 0))
         tk.Button(cart_container, text="🛒  Cart", font=self.header_font, bg="#0a2540", fg="white", activebackground="#113a63", activeforeground="white", padx=15, pady=10, borderwidth=0, command=self.open_order_summary).pack()
-        badge_text = str(self.cart_count) if self.cart_count > 0 else ""
+        badge_text = str(self.cart.count) if self.cart.count > 0 else ""
         self.cart_badge = tk.Label(cart_container, text=badge_text, bg="#cc0000", fg="white", font=font.Font(family="Helvetica", size=9, weight="bold"), padx=4, pady=1)
         self.cart_badge.place(relx=1.0, rely=0.0, anchor="ne")
         tk.Button(btn_bar, text="Add to Cart ➔", font=self.header_font, bg="#00d4ff", fg="#0a2540", activebackground="#00b8e6", padx=20, pady=10, borderwidth=0, command=self._add_to_cart).pack(side="right")
@@ -618,251 +634,43 @@ class HospitalPortal:
             tk.Button(passport_bar, text="🧾  Invoice", font=self.body_font, bg="#008080", fg="white", activebackground="#005f5f", borderwidth=0, padx=15, pady=7, command=lambda o=order: self.generate_invoice(o)).pack(side="left", padx=(10, 0))
 
     def open_payment_page(self, total, on_success):
-        payment = tk.Toplevel(self.root)
-        payment.title("MedCAD | Secure Payment")
-        payment.geometry("520x580")
-        payment.resizable(False, False)
-        payment.configure(bg="#f4f7f6")
-
-        # Header
-        header = tk.Frame(payment, bg="#0a2540", height=70)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        tk.Label(header, text="💳  Secure Payment", font=self.title_font,
-                 fg="white", bg="#0a2540").pack(side="left", padx=20, pady=15)
-        tk.Label(header, text="🔒 SSL Encrypted", font=self.small_font,
-                 fg="#aaaaaa", bg="#0a2540").pack(side="right", padx=20)
-
-        # Amount bar
-        amt = tk.Frame(payment, bg="#e6f2f2", pady=12, padx=20)
-        amt.pack(fill="x")
-        tk.Label(amt, text="Amount Due:", font=self.header_font,
-                 bg="#e6f2f2", fg="#004d4d").pack(side="left")
-        tk.Label(amt, text=f"  £{total:.2f}", font=font.Font(family="Helvetica", size=18, weight="bold"),
-                 bg="#e6f2f2", fg="#0a2540").pack(side="left")
-
-        # Form
-        form = tk.Frame(payment, bg="#f4f7f6", padx=35, pady=20)
-        form.pack(fill="both", expand=True)
-
-        lbl_font = font.Font(family="Helvetica", size=11)
-        entry_font = font.Font(family="Helvetica", size=12)
-
-        # Card type
-        tk.Label(form, text="Card Type", font=lbl_font, bg="#f4f7f6", fg="#333333").pack(anchor="w")
-        card_type_var = tk.StringVar(value="Visa")
-        ct_frame = tk.Frame(form, bg="#f4f7f6")
-        ct_frame.pack(anchor="w", pady=(4, 14))
-        for ctype in ["Visa", "Mastercard", "Amex"]:
-            tk.Radiobutton(ct_frame, text=ctype, variable=card_type_var, value=ctype,
-                           font=lbl_font, bg="#f4f7f6", activebackground="#f4f7f6").pack(side="left", padx=(0, 16))
-
-        # Cardholder name
-        tk.Label(form, text="Cardholder Name", font=lbl_font, bg="#f4f7f6", fg="#333333").pack(anchor="w")
-        name_entry = tk.Entry(form, font=entry_font, relief="solid", bd=1)
-        name_entry.pack(fill="x", ipady=7, pady=(4, 14))
-
-        # Card number
-        tk.Label(form, text="Card Number", font=lbl_font, bg="#f4f7f6", fg="#333333").pack(anchor="w")
-        card_entry = tk.Entry(form, font=entry_font, relief="solid", bd=1, fg="#aaaaaa")
-        card_entry.pack(fill="x", ipady=7, pady=(4, 14))
-        card_entry.insert(0, "XXXX  XXXX  XXXX  XXXX")
-
-        def card_focus_in(_):
-            if card_entry.get() == "XXXX  XXXX  XXXX  XXXX":
-                card_entry.delete(0, "end")
-                card_entry.config(fg="#111111")
-
-        def card_focus_out(_):
-            if card_entry.get().strip() == "":
-                card_entry.insert(0, "XXXX  XXXX  XXXX  XXXX")
-                card_entry.config(fg="#aaaaaa")
-
-        card_entry.bind("<FocusIn>", card_focus_in)
-        card_entry.bind("<FocusOut>", card_focus_out)
-
-        # Expiry + CVV row
-        row2 = tk.Frame(form, bg="#f4f7f6")
-        row2.pack(fill="x", pady=(0, 14))
-
-        exp_frame = tk.Frame(row2, bg="#f4f7f6")
-        exp_frame.pack(side="left", fill="x", expand=True, padx=(0, 20))
-        tk.Label(exp_frame, text="Expiry Date (MM/YY)", font=lbl_font, bg="#f4f7f6", fg="#333333").pack(anchor="w")
-        exp_entry = tk.Entry(exp_frame, font=entry_font, relief="solid", bd=1, width=10, fg="#aaaaaa")
-        exp_entry.pack(anchor="w", ipady=7, pady=(4, 0))
-        exp_entry.insert(0, "MM/YY")
-
-        def exp_focus_in(_):
-            if exp_entry.get() == "MM/YY":
-                exp_entry.delete(0, "end")
-                exp_entry.config(fg="#111111")
-
-        def exp_focus_out(_):
-            if exp_entry.get().strip() == "":
-                exp_entry.insert(0, "MM/YY")
-                exp_entry.config(fg="#aaaaaa")
-
-        exp_entry.bind("<FocusIn>", exp_focus_in)
-        exp_entry.bind("<FocusOut>", exp_focus_out)
-
-        cvv_frame = tk.Frame(row2, bg="#f4f7f6")
-        cvv_frame.pack(side="right", padx=(0, 0))
-        tk.Label(cvv_frame, text="CVV", font=lbl_font, bg="#f4f7f6", fg="#333333").pack(anchor="w")
-        cvv_entry = tk.Entry(cvv_frame, font=entry_font, relief="solid", bd=1, width=6, show="●")
-        cvv_entry.pack(anchor="w", ipady=7, pady=(4, 0))
-
-        # Error label
-        error_lbl = tk.Label(form, text="", font=lbl_font, bg="#f4f7f6", fg="#cc0000")
-        error_lbl.pack(anchor="w")
-
-        def process_payment():
-            name = name_entry.get().strip()
-            exp = exp_entry.get().strip()
-            cvv = cvv_entry.get().strip()
-
-            if not name:
-                error_lbl.config(text="⚠  Please enter the cardholder name.")
-                return
-            raw_card = card_entry.get().replace(" ", "")
-            if len(raw_card) != 16 or not raw_card.isdigit():
-                error_lbl.config(text="⚠  Card number must be 16 digits.")
-                return
-            if len(exp) != 5 or exp[2] != "/" or not exp[:2].isdigit() or not exp[3:].isdigit():
-                error_lbl.config(text="⚠  Enter expiry as MM/YY.")
-                return
-            if len(cvv) not in (3, 4) or not cvv.isdigit():
-                error_lbl.config(text="⚠  CVV must be 3 or 4 digits.")
-                return
-
-            on_success()
-            payment.destroy()
-
-        tk.Button(form, text=f"  Pay  £{total:.2f}  Now  🔒  ", font=self.header_font,
-                  bg="#0a2540", fg="white", activebackground="#113a63",
-                  borderwidth=0, padx=10, pady=12, command=process_payment).pack(fill="x", pady=(6, 0))
-
-        tk.Label(form, text="🔒  256-bit SSL encrypted. Your card details are never stored.",
-                 font=self.small_font, bg="#f4f7f6", fg="#888888").pack(pady=(10, 0))
+        return payment.open_payment_page(
+            parent=self.root,
+            total=total,
+            on_success=on_success,
+            title_font=self.title_font,
+            header_font=self.header_font,
+            small_font=self.small_font,
+        )
 
     def open_order_summary(self):
-        summary = tk.Toplevel(self.root)
-        summary.title("MedCAD | Order Summary")
-        summary.geometry("900x600")
-        summary.configure(bg="#f4f7f6")
-        summary.resizable(True, True)
+        def confirm_order(total, refresh, close_cart_window):
+            close_cart_window()
 
-        # ── Header ──
-        header = tk.Frame(summary, bg="#008080", height=70)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        tk.Label(header, text="🛒 Order Summary", font=self.title_font,
-                 fg="white", bg="#008080").pack(side="left", padx=20, pady=15)
-        tk.Button(header, text="✕  Close", font=self.body_font, bg="#cc0000",
-                  fg="white", activebackground="#a30000", borderwidth=0,
-                  padx=15, pady=6, command=summary.destroy).pack(side="right", padx=20, pady=18)
+            def after_payment():
+                confirmed = {
+                    "order_number": self.cart.order_number,
+                    "items": list(self.cart.items),
+                }
+                self.confirmed_orders.append(confirmed)
+                amount_paid = sum(it.get("price_val", 0.0) for it in confirmed["items"])
+                self.cart.clear()
+                self.cart_badge.config(text="")
+                # Cart window is closed before payment opens; don't refresh destroyed widgets.
+                self.open_your_orders_page(amount_paid=amount_paid)
 
-        # ── Order number bar (permanent) ──
-        order_bar = tk.Frame(summary, bg="#e6f2f2", pady=8, padx=15)
-        order_bar.pack(fill="x", padx=20, pady=(12, 0))
-        order_num_var = tk.StringVar(value=f"Order Number:  {self.order_number or '—'}")
-        tk.Label(order_bar, textvariable=order_num_var,
-                 font=self.header_font, bg="#e6f2f2", fg="#004d4d").pack(side="left")
+            self.open_payment_page(total, after_payment)
 
-        # ── Empty-cart label (hidden when items present) ──
-        empty_lbl = tk.Label(summary, text="Your cart is empty. Add items from the catalog.",
-                             font=self.body_font, bg="#f4f7f6", fg="#888888")
-
-        # ── Treeview (permanent) ──
-        tree_frame = tk.Frame(summary, bg="#f4f7f6")
-        columns = ("#", "Part ID", "Component Name", "OEM", "Price", "Est. Time")
-        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", selectmode="browse")
-        widths = [40, 80, 250, 120, 80, 110]
-        for col, w in zip(columns, widths):
-            tree.heading(col, text=col)
-            tree.column(col, width=w, anchor="w", stretch=False)
-        tree.column("Component Name", stretch=True)
-        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side="right", fill="y")
-        tree.pack(side="left", fill="both", expand=True)
-
-        # ── Bottom controls (permanent) ──
-        bottom = tk.Frame(summary, bg="#f4f7f6")
-        bottom.pack(side="bottom", fill="x", padx=20, pady=10)
-        tk.Frame(summary, bg="#cccccc", height=1).pack(side="bottom", fill="x", padx=20)
-
-        footer_lbl = tk.Label(bottom, text="", font=self.header_font,
-                               bg="#f4f7f6", fg="#0a2540")
-        footer_lbl.pack(side="left")
-
-        pay_btn = tk.Button(bottom, text="Confirm Order & Make Payment  💳",
-                            font=self.header_font, bg="#008080", fg="white",
-                            activebackground="#006666", borderwidth=0, padx=20, pady=8)
-        pay_btn.pack(side="right")
-
-        def remove_selected():
-            sel = tree.selection()
-            if not sel:
-                return
-            remove_item(int(sel[0]))
-
-        tk.Button(bottom, text="✕  Remove Selected", font=self.body_font,
-                  bg="#cc0000", fg="white", activebackground="#a30000",
-                  borderwidth=0, padx=12, pady=5,
-                  command=remove_selected).pack(side="left", padx=(10, 0))
-
-        def refresh():
-            # Clear treeview
-            for row in tree.get_children():
-                tree.delete(row)
-
-            if not self.cart_items:
-                tree_frame.pack_forget()
-                empty_lbl.pack(pady=60)
-                footer_lbl.config(text="")
-                pay_btn.config(state="disabled")
-                order_num_var.set("Order Number:  —")
-                return
-
-            empty_lbl.pack_forget()
-            tree_frame.pack(fill="both", expand=True, padx=20, pady=(8, 0))
-
-            order_num_var.set(f"Order Number:  {self.order_number or '—'}")
-
-            for i, it in enumerate(self.cart_items):
-                tree.insert("", tk.END, iid=str(i),
-                            values=(i + 1, it["id"], it["name"],
-                                    it["oem"], it["price"], it["time"]))
-
-            total = sum(it["price_val"] for it in self.cart_items)
-            footer_lbl.config(text=f"Items: {len(self.cart_items)}    Total: £{total:.2f}")
-            pay_btn.config(state="normal",
-                           command=lambda t=total: self.open_payment_page(t, confirm_order))
-
-        def confirm_order():
-            self.confirmed_orders.append({
-                "order_number": self.order_number,
-                "items": list(self.cart_items),
-            })
-            self.cart_items.clear()
-            self.cart_count = 0
-            self.order_number = None
-            self.cart_badge.config(text="")
-            notif = tk.Frame(summary, bg="#28a745", padx=15, pady=12)
-            notif.place(relx=1.0, rely=0.0, anchor="ne", x=-15, y=15)
-            tk.Label(notif, text="✓  Order confirmed, you may close this page now",
-                     font=self.body_font, bg="#28a745", fg="white").pack()
-            refresh()
-
-        def remove_item(index):
-            self.cart_items.pop(index)
-            self.cart_count -= 1
-            self.cart_badge.config(text=str(self.cart_count) if self.cart_count > 0 else "")
-            if not self.cart_items:
-                self.order_number = None
-            refresh()
-
-        refresh()
+        cart_list.open_cart_window(
+            parent=self.root,
+            cart=self.cart,
+            title_font=self.title_font,
+            header_font=self.header_font,
+            body_font=self.body_font,
+            small_font=self.small_font,
+            on_confirm_order=confirm_order,
+            on_cart_changed=lambda c: self.cart_badge.config(text=str(c.count) if c.count > 0 else ""),
+        )
 
     def _select_part(self, iid, part_id):
         if self.selected_iid and self.selected_iid != iid:
@@ -890,12 +698,8 @@ class HospitalPortal:
             "price": price_str,
             "price_val": price_val,
         }
-        if self.order_number is None:
-            chars = string.ascii_uppercase + string.digits
-            self.order_number = "ORD-" + "".join(random.choices(chars, k=3)) + "-" + "".join(random.choices(chars, k=4))
-        self.cart_items.append(item)
-        self.cart_count += 1
-        self.cart_badge.config(text=str(self.cart_count))
+        self.cart.add(item)
+        self.cart_badge.config(text=str(self.cart.count))
 
     def on_part_double_click(self, _event):
         selected = self.tree.selection()

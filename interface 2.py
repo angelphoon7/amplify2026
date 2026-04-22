@@ -17,6 +17,7 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
 import cart_list
 import payment
+import order
 
 PART_SPECS = {
     "MC-104": {
@@ -630,15 +631,24 @@ class HospitalPortal:
     def open_order_summary(self):
         def confirm_order(total, refresh):
             def after_payment():
-                self.confirmed_orders.append(
-                    {
-                        "order_number": self.cart.order_number,
-                        "items": list(self.cart.items),
-                    }
-                )
+                confirmed = {
+                    "order_number": self.cart.order_number,
+                    "items": list(self.cart.items),
+                }
+                self.confirmed_orders.append(confirmed)
                 self.cart.clear()
                 self.cart_badge.config(text="")
                 refresh()
+                order.open_order_window(
+                    parent=self.root,
+                    order=confirmed,
+                    title_font=self.title_font,
+                    header_font=self.header_font,
+                    body_font=self.body_font,
+                    small_font=self.small_font,
+                    on_open_passport=self.open_traceability_passport,
+                    on_open_invoice=self.generate_invoice,
+                )
 
             self.open_payment_page(total, after_payment)
 

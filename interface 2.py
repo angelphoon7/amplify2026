@@ -380,6 +380,21 @@ class HospitalPortal:
         self.details_content = tk.Frame(self.details_panel, bg="white")
         self.details_content.pack(fill="both", expand=True)
 
+        # Pin button row to bottom first so it's always visible
+        btn_frame = tk.Frame(self.details_content, bg="white")
+        btn_frame.pack(side="bottom", fill="x")
+        tk.Label(btn_frame, text="Status: Ready for Dispatch. File integrity verified.", font=self.body_font, bg="white", fg="#555555").pack(side="left")
+        cart_container = tk.Frame(btn_frame, bg="white")
+        cart_container.pack(side="right", padx=(10, 0))
+        tk.Button(cart_container, text="🛒  Cart", font=self.header_font, bg="#0a2540", fg="white", activebackground="#113a63", activeforeground="white", padx=15, pady=10, borderwidth=0, command=self.open_order_summary).pack()
+        badge_text = str(self.cart_count) if self.cart_count > 0 else ""
+        self.cart_badge = tk.Label(cart_container, text=badge_text, bg="#cc0000", fg="white", font=font.Font(family="Helvetica", size=9, weight="bold"), padx=4, pady=1)
+        self.cart_badge.place(relx=1.0, rely=0.0, anchor="ne")
+        tk.Button(btn_frame, text="Add to Cart ➔", font=self.header_font, bg="#00d4ff", fg="#0a2540", activebackground="#00b8e6", padx=20, pady=10, borderwidth=0, command=self._add_to_cart).pack(side="right")
+
+        tk.Frame(self.details_content, bg="#eeeeee", height=2).pack(side="bottom", fill="x", pady=(10, 0))
+
+        # Title and specs fill remaining space above
         tk.Label(self.details_content, text=f"Part Specifications: {spec['name']}", font=self.title_font, bg="white", fg="#0a2540").pack(anchor="w", pady=(0, 15))
 
         info_frame = tk.Frame(self.details_content, bg="white")
@@ -403,21 +418,6 @@ class HospitalPortal:
         for i, line in enumerate(spec["log"]):
             color = "#cc0000" if i == 2 else "#009900" if i == 3 else "black"
             tk.Label(col3, text=line, font=self.body_font, bg="white", fg=color).pack(anchor="w")
-
-        tk.Frame(self.details_content, bg="#eeeeee", height=2).pack(fill="x", pady=20)
-
-        btn_frame = tk.Frame(self.details_content, bg="white")
-        btn_frame.pack(fill="x")
-        tk.Label(btn_frame, text="Status: Ready for Dispatch. File integrity verified.", font=self.body_font, bg="white", fg="#555555").pack(side="left")
-
-        cart_container = tk.Frame(btn_frame, bg="white")
-        cart_container.pack(side="right", padx=(10, 0))
-        tk.Button(cart_container, text="🛒  Cart", font=self.header_font, bg="#0a2540", fg="white", activebackground="#113a63", activeforeground="white", padx=15, pady=10, borderwidth=0, command=self.open_order_summary).pack()
-        badge_text = str(self.cart_count) if self.cart_count > 0 else ""
-        self.cart_badge = tk.Label(cart_container, text=badge_text, bg="#cc0000", fg="white", font=font.Font(family="Helvetica", size=9, weight="bold"), padx=4, pady=1)
-        self.cart_badge.place(relx=1.0, rely=0.0, anchor="ne")
-
-        tk.Button(btn_frame, text="Add to Cart ➔", font=self.header_font, bg="#00d4ff", fg="#0a2540", activebackground="#00b8e6", padx=20, pady=10, borderwidth=0, command=self._add_to_cart).pack(side="right")
 
     def open_traceability_passport(self):
         root3 = tk.Toplevel(self.root)

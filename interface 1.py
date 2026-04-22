@@ -149,13 +149,14 @@ class LandingPage:
         os.startfile(pdf_path)
 
     def open_hospital_portal(self):
-        root2 = tk.Tk()
+        for w in self.root.winfo_children():
+            w.destroy()
+        self.root.title("MedCAD | Hospital Ordering Portal")
+        self.root.geometry("1100x750")
         spec = importlib.util.spec_from_file_location("interface2", os.path.join(os.path.dirname(os.path.abspath(__file__)), "interface 2.py"))
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-        mod.HospitalPortal(root2)
-        root2.after(400, self.root.destroy)
-        root2.mainloop()
+        mod.HospitalPortal(self.root)
 
     def build_auth_buttons(self):
         auth_frame = tk.Frame(self.root, bg="#f4f7f6")

@@ -310,13 +310,14 @@ class HospitalPortal:
         self.build_part_details_panel()
 
     def open_landing_page(self):
-        self.root.destroy()
-        root2 = tk.Tk()
+        for w in self.root.winfo_children():
+            w.destroy()
+        self.root.title("MedCAD Digital Library | National Digital Supply Network")
+        self.root.geometry("950x750")
         spec = importlib.util.spec_from_file_location("interface1", os.path.join(os.path.dirname(os.path.abspath(__file__)), "interface 1.py"))
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-        mod.LandingPage(root2)
-        root2.mainloop()
+        mod.LandingPage(self.root)
 
     def build_header(self):
         header = tk.Frame(self.root, bg="#008080", height=70)
@@ -326,7 +327,7 @@ class HospitalPortal:
         tk.Button(header, text="Log Out", font=self.body_font, bg="#cc0000", fg="white", activebackground="#a30000", activeforeground="white", borderwidth=0, padx=15, pady=6, command=self.open_landing_page).pack(side="right", padx=20, pady=18)
         tk.Button(header, text="📋  Your Order", font=self.body_font, bg="#005f5f", fg="white",
           activebackground="#004d4d", activeforeground="white", borderwidth=0,
-          padx=15, pady=6, command=self.open_order_summary).pack(side="right", padx=(0, 10), pady=18)
+          padx=15, pady=6, command=self.open_confirmed_orders).pack(side="right", padx=(0, 10), pady=18)
         tk.Label(header, text="Role: In-house Engineering", font=self.body_font, fg="#e0e0e0", bg="#008080").pack(side="right", padx=(20, 0), pady=20)
 
     def build_welcome_banner(self):

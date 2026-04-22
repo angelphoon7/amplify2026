@@ -17,7 +17,7 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
 import cart_list
 import payment
-import order
+import your_order
 
 PART_SPECS = {
     "MC-104": {
@@ -328,8 +328,22 @@ class HospitalPortal:
         tk.Button(header, text="Log Out", font=self.body_font, bg="#cc0000", fg="white", activebackground="#a30000", activeforeground="white", borderwidth=0, padx=15, pady=6, command=self.open_landing_page).pack(side="right", padx=20, pady=18)
         tk.Button(header, text="📋  Your Order", font=self.body_font, bg="#005f5f", fg="white",
           activebackground="#004d4d", activeforeground="white", borderwidth=0,
-          padx=15, pady=6, command=self.open_order_summary).pack(side="right", padx=(0, 10), pady=18)
+          padx=15, pady=6, command=self.open_your_orders_page).pack(side="right", padx=(0, 10), pady=18)
         tk.Label(header, text="Role: In-house Engineering", font=self.body_font, fg="#e0e0e0", bg="#008080").pack(side="right", padx=(20, 0), pady=20)
+
+    def open_your_orders_page(self, amount_paid=None):
+        # Show final "Your Orders" page implemented in your_order.py
+        your_order.open_your_orders_window(
+            parent=self.root,
+            orders=list(self.confirmed_orders),
+            amount_paid=amount_paid,
+            title_font=self.title_font,
+            header_font=self.header_font,
+            body_font=self.body_font,
+            small_font=self.small_font,
+            on_open_passport=self.open_traceability_passport,
+            on_open_invoice=self.generate_invoice,
+        )
 
     def build_welcome_banner(self):
         banner = tk.Frame(self.root, bg="#e6f2f2", pady=15, padx=20)
@@ -638,19 +652,11 @@ class HospitalPortal:
                     "items": list(self.cart.items),
                 }
                 self.confirmed_orders.append(confirmed)
+                amount_paid = sum(it.get("price_val", 0.0) for it in confirmed["items"])
                 self.cart.clear()
                 self.cart_badge.config(text="")
-                refresh()
-                order.open_order_window(
-                    parent=self.root,
-                    order=confirmed,
-                    title_font=self.title_font,
-                    header_font=self.header_font,
-                    body_font=self.body_font,
-                    small_font=self.small_font,
-                    on_open_passport=self.open_traceability_passport,
-                    on_open_invoice=self.generate_invoice,
-                )
+                # Cart window is closed before payment opens; don't refresh destroyed widgets.
+                self.open_your_orders_page(amount_paid=amount_paid)
 
             self.open_payment_page(total, after_payment)
 

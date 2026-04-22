@@ -128,8 +128,9 @@ def open_payment_page(
             error_lbl.config(text="⚠  CVV must be 3 or 4 digits.")
             return
 
-        on_success()
+        # Immediately proceed to the success flow (index.py will open your_order.py).
         payment.destroy()
+        parent.after(0, on_success)
 
     tk.Button(
         form,

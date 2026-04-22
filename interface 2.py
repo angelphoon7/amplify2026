@@ -15,6 +15,8 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
+import cart_list
+
 PART_SPECS = {
     "MC-104": {
         "name": "Ventilator Monitor Bracket (MC-104)",
@@ -298,10 +300,8 @@ class HospitalPortal:
         self.header_font = font.Font(family="Helvetica", size=13, weight="bold")
         self.body_font = font.Font(family="Helvetica", size=11)
         self.small_font = font.Font(family="Helvetica", size=10)
-        self.cart_count = 0
-        self.cart_items = []
+        self.cart = cart_list.Cart()
         self.confirmed_orders = []
-        self.order_number = None
         self.current_part_id = "MC-104"
 
         self.build_header()
@@ -406,7 +406,7 @@ class HospitalPortal:
         cart_container = tk.Frame(btn_bar, bg="white")
         cart_container.pack(side="right", padx=(10, 0))
         tk.Button(cart_container, text="🛒  Cart", font=self.header_font, bg="#0a2540", fg="white", activebackground="#113a63", activeforeground="white", padx=15, pady=10, borderwidth=0, command=self.open_order_summary).pack()
-        badge_text = str(self.cart_count) if self.cart_count > 0 else ""
+        badge_text = str(self.cart.count) if self.cart.count > 0 else ""
         self.cart_badge = tk.Label(cart_container, text=badge_text, bg="#cc0000", fg="white", font=font.Font(family="Helvetica", size=9, weight="bold"), padx=4, pady=1)
         self.cart_badge.place(relx=1.0, rely=0.0, anchor="ne")
         tk.Button(btn_bar, text="Add to Cart ➔", font=self.header_font, bg="#00d4ff", fg="#0a2540", activebackground="#00b8e6", padx=20, pady=10, borderwidth=0, command=self._add_to_cart).pack(side="right")
@@ -744,124 +744,30 @@ class HospitalPortal:
                  font=self.small_font, bg="#f4f7f6", fg="#888888").pack(pady=(10, 0))
 
     def open_order_summary(self):
-        summary = tk.Toplevel(self.root)
-        summary.title("MedCAD | Order Summary")
-        summary.geometry("900x600")
-        summary.configure(bg="#f4f7f6")
-        summary.resizable(True, True)
+        def confirm_order(total, refresh):
+            def after_payment():
+                self.confirmed_orders.append(
+                    {
+                        "order_number": self.cart.order_number,
+                        "items": list(self.cart.items),
+                    }
+                )
+                self.cart.clear()
+                self.cart_badge.config(text="")
+                refresh()
 
-        # ── Header ──
-        header = tk.Frame(summary, bg="#008080", height=70)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        tk.Label(header, text="🛒 Order Summary", font=self.title_font,
-                 fg="white", bg="#008080").pack(side="left", padx=20, pady=15)
-        tk.Button(header, text="✕  Close", font=self.body_font, bg="#cc0000",
-                  fg="white", activebackground="#a30000", borderwidth=0,
-                  padx=15, pady=6, command=summary.destroy).pack(side="right", padx=20, pady=18)
+            self.open_payment_page(total, after_payment)
 
-        # ── Order number bar (permanent) ──
-        order_bar = tk.Frame(summary, bg="#e6f2f2", pady=8, padx=15)
-        order_bar.pack(fill="x", padx=20, pady=(12, 0))
-        order_num_var = tk.StringVar(value=f"Order Number:  {self.order_number or '—'}")
-        tk.Label(order_bar, textvariable=order_num_var,
-                 font=self.header_font, bg="#e6f2f2", fg="#004d4d").pack(side="left")
-
-        # ── Empty-cart label (hidden when items present) ──
-        empty_lbl = tk.Label(summary, text="Your cart is empty. Add items from the catalog.",
-                             font=self.body_font, bg="#f4f7f6", fg="#888888")
-
-        # ── Treeview (permanent) ──
-        tree_frame = tk.Frame(summary, bg="#f4f7f6")
-        columns = ("#", "Part ID", "Component Name", "OEM", "Price", "Est. Time")
-        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", selectmode="browse")
-        widths = [40, 80, 250, 120, 80, 110]
-        for col, w in zip(columns, widths):
-            tree.heading(col, text=col)
-            tree.column(col, width=w, anchor="w", stretch=False)
-        tree.column("Component Name", stretch=True)
-        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side="right", fill="y")
-        tree.pack(side="left", fill="both", expand=True)
-
-        # ── Bottom controls (permanent) ──
-        bottom = tk.Frame(summary, bg="#f4f7f6")
-        bottom.pack(side="bottom", fill="x", padx=20, pady=10)
-        tk.Frame(summary, bg="#cccccc", height=1).pack(side="bottom", fill="x", padx=20)
-
-        footer_lbl = tk.Label(bottom, text="", font=self.header_font,
-                               bg="#f4f7f6", fg="#0a2540")
-        footer_lbl.pack(side="left")
-
-        pay_btn = tk.Button(bottom, text="Confirm Order & Make Payment  💳",
-                            font=self.header_font, bg="#008080", fg="white",
-                            activebackground="#006666", borderwidth=0, padx=20, pady=8)
-        pay_btn.pack(side="right")
-
-        def remove_selected():
-            sel = tree.selection()
-            if not sel:
-                return
-            remove_item(int(sel[0]))
-
-        tk.Button(bottom, text="✕  Remove Selected", font=self.body_font,
-                  bg="#cc0000", fg="white", activebackground="#a30000",
-                  borderwidth=0, padx=12, pady=5,
-                  command=remove_selected).pack(side="left", padx=(10, 0))
-
-        def refresh():
-            # Clear treeview
-            for row in tree.get_children():
-                tree.delete(row)
-
-            if not self.cart_items:
-                tree_frame.pack_forget()
-                empty_lbl.pack(pady=60)
-                footer_lbl.config(text="")
-                pay_btn.config(state="disabled")
-                order_num_var.set("Order Number:  —")
-                return
-
-            empty_lbl.pack_forget()
-            tree_frame.pack(fill="both", expand=True, padx=20, pady=(8, 0))
-
-            order_num_var.set(f"Order Number:  {self.order_number or '—'}")
-
-            for i, it in enumerate(self.cart_items):
-                tree.insert("", tk.END, iid=str(i),
-                            values=(i + 1, it["id"], it["name"],
-                                    it["oem"], it["price"], it["time"]))
-
-            total = sum(it["price_val"] for it in self.cart_items)
-            footer_lbl.config(text=f"Items: {len(self.cart_items)}    Total: £{total:.2f}")
-            pay_btn.config(state="normal",
-                           command=lambda t=total: self.open_payment_page(t, confirm_order))
-
-        def confirm_order():
-            self.confirmed_orders.append({
-                "order_number": self.order_number,
-                "items": list(self.cart_items),
-            })
-            self.cart_items.clear()
-            self.cart_count = 0
-            self.order_number = None
-            self.cart_badge.config(text="")
-            notif = tk.Frame(summary, bg="#28a745", padx=15, pady=12)
-            notif.place(relx=1.0, rely=0.0, anchor="ne", x=-15, y=15)
-            tk.Label(notif, text="✓  Order confirmed, you may close this page now",
-                     font=self.body_font, bg="#28a745", fg="white").pack()
-            refresh()
-
-        def remove_item(index):
-            self.cart_items.pop(index)
-            self.cart_count -= 1
-            self.cart_badge.config(text=str(self.cart_count) if self.cart_count > 0 else "")
-            if not self.cart_items:
-                self.order_number = None
-            refresh()
-
-        refresh()
+        cart_list.open_cart_window(
+            parent=self.root,
+            cart=self.cart,
+            title_font=self.title_font,
+            header_font=self.header_font,
+            body_font=self.body_font,
+            small_font=self.small_font,
+            on_confirm_order=confirm_order,
+            on_cart_changed=lambda c: self.cart_badge.config(text=str(c.count) if c.count > 0 else ""),
+        )
 
     def _select_part(self, iid, part_id):
         if self.selected_iid and self.selected_iid != iid:
@@ -889,12 +795,8 @@ class HospitalPortal:
             "price": price_str,
             "price_val": price_val,
         }
-        if self.order_number is None:
-            chars = string.ascii_uppercase + string.digits
-            self.order_number = "ORD-" + "".join(random.choices(chars, k=3)) + "-" + "".join(random.choices(chars, k=4))
-        self.cart_items.append(item)
-        self.cart_count += 1
-        self.cart_badge.config(text=str(self.cart_count))
+        self.cart.add(item)
+        self.cart_badge.config(text=str(self.cart.count))
 
     def on_part_double_click(self, _event):
         selected = self.tree.selection()

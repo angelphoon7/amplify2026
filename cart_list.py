@@ -167,7 +167,7 @@ def open_cart_window(
 
         total = cart.total()
         footer_lbl.config(text=f"Items: {cart.count}    Total: £{total:.2f}")
-        pay_btn.config(state="normal", command=lambda t=total: on_confirm_order(t, refresh))
+        pay_btn.config(state="normal", command=lambda t=total: on_confirm_order(t, refresh, summary.destroy))
         if on_cart_changed:
             on_cart_changed(cart)
 

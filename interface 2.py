@@ -629,7 +629,9 @@ class HospitalPortal:
         )
 
     def open_order_summary(self):
-        def confirm_order(total, refresh):
+        def confirm_order(total, refresh, close_cart_window):
+            close_cart_window()
+
             def after_payment():
                 confirmed = {
                     "order_number": self.cart.order_number,
